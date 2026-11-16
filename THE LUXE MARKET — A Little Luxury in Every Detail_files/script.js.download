@@ -1,0 +1,1049 @@
+/* =========================================================
+   THE LUXE MARKET — interaction layer
+   A static boutique demo. No real payments or messages.
+   ========================================================= */
+(() => {
+  "use strict";
+
+  /* ---------- Catalogue ---------- */
+  const CATEGORY_LABELS = {
+    fashion: "Fashion & Clothing",
+    bags: "Bags & Accessories",
+    watches: "Watches & Jewelry",
+    beauty: "Beauty & Skincare",
+    perfumes: "Perfumes & Fragrances",
+    home: "Home & Living"
+  };
+
+  const PRODUCTS = [
+    {
+      id: 1,
+      name: "Elegant Everyday Dress",
+      category: "fashion",
+      price: 2890,
+      rating: 4.8,
+      badge: "Best Seller",
+      image: "fashion-dress.jpg",
+      description:
+        "A softly draped satin midi in warm champagne, designed to move beautifully from daytime errands to evening dinners. Finished with a detachable waist sash and a fluid, flattering cowl neckline."
+    },
+    {
+      id: 2,
+      name: "Cozy Knit Sweater",
+      category: "fashion",
+      price: 1950,
+      rating: 4.7,
+      badge: "New Arrival",
+      image: "knit-sweater.jpg",
+      description:
+        "An oversized, cloud-soft knit in oatmeal beige. Relaxed shoulders, ribbed cuffs and a gently cropped hem make it the layer you will reach for all season long."
+    },
+    {
+      id: 3,
+      name: "Classic Shoulder Bag",
+      category: "bags",
+      price: 4250,
+      rating: 4.9,
+      badge: "Best Seller",
+      image: "shoulder-bag.jpg",
+      description:
+        "A timeless structured silhouette in caramel-taupe leather, with a polished gold clasp and an adjustable strap that sits comfortably on the shoulder. Roomy enough for every day, refined enough for evenings."
+    },
+    {
+      id: 4,
+      name: "Minimalist Everyday Tote",
+      category: "bags",
+      price: 3180,
+      rating: 4.6,
+      badge: "",
+      image: "tote-bag.jpg",
+      description:
+        "Clean lines, a roomy interior and mocha leather handles that soften with time. An easy, elegant companion for workdays, markets and slow weekends."
+    },
+    {
+      id: 5,
+      name: "Rose Gold Wristwatch",
+      category: "watches",
+      price: 5900,
+      rating: 4.9,
+      badge: "Best Seller",
+      image: "rose-gold-watch.jpg",
+      description:
+        "A delicate rose-gold mesh watch with a mother-of-pearl dial. Light on the wrist and quietly luminous — the kind of piece that completes everything."
+    },
+    {
+      id: 6,
+      name: "Elegant Pearl Bracelet",
+      category: "watches",
+      price: 2450,
+      rating: 4.8,
+      badge: "New Arrival",
+      image: "pearl-bracelet.jpg",
+      description:
+        "Hand-knotted freshwater pearls finished with a champagne-gold clasp. A soft, timeless glow for everyday wear and special occasions alike."
+    },
+    {
+      id: 7,
+      name: "Hydrating Glow Serum",
+      category: "beauty",
+      price: 1280,
+      rating: 4.7,
+      badge: "Best Seller",
+      image: "skincare-serum.jpg",
+      description:
+        "A lightweight golden serum with hyaluronic acid and botanical squalane that sinks in quickly, leaving skin plump, calm and softly luminous."
+    },
+    {
+      id: 8,
+      name: "Daily Skincare Set",
+      category: "beauty",
+      price: 2150,
+      rating: 4.6,
+      badge: "New Arrival",
+      image: "skincare-set.jpg",
+      description:
+        "A considered daily ritual in three steps: a gentle cleanser, a hydrating mist and a nourishing cream. Packaged in warm neutral glass for the loveliest shelf."
+    },
+    {
+      id: 9,
+      name: "Velvet Bloom Eau de Parfum",
+      category: "perfumes",
+      price: 3750,
+      rating: 4.9,
+      badge: "New Arrival",
+      image: "velvet-perfume.jpg",
+      description:
+        "A romantic eau de parfum opening with rose petals and pear, settling into soft musk and cashmere wood. Warm, modern and quietly memorable."
+    },
+    {
+      id: 10,
+      name: "Warm Vanilla Fragrance",
+      category: "perfumes",
+      price: 2980,
+      rating: 4.7,
+      badge: "",
+      image: "vanilla-perfume.jpg",
+      description:
+        "Creamy vanilla, amber and a whisper of sandalwood. A cozy, skin-close fragrance made for slow mornings and candlelit evenings."
+    },
+    {
+      id: 11,
+      name: "Cozy Scented Candle",
+      category: "home",
+      price: 890,
+      rating: 4.8,
+      badge: "Best Seller",
+      image: "scented-candle.jpg",
+      description:
+        "Hand-poured soy wax with notes of fig, amber and cedar, in a reusable cream ceramic vessel. Around 45 hours of warm, quiet glow."
+    },
+    {
+      id: 12,
+      name: "Minimalist Ceramic Vase",
+      category: "home",
+      price: 1650,
+      rating: 4.6,
+      badge: "New Arrival",
+      image: "ceramic-vase.jpg",
+      description:
+        "A sculptural ceramic vase with an organic curve and a chalk-soft matte finish. Beautiful on its own or styled with dried stems."
+    }
+  ];
+
+  const PRODUCT_MAP = new Map(PRODUCTS.map((product) => [product.id, product]));
+  const FREE_DELIVERY_THRESHOLD = 2500;
+  const DELIVERY_FEE = 150;
+  const STORAGE_KEYS = { cart: "luxeMarketCart", wishlist: "luxeMarketWishlist" };
+  const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------- Storage ---------- */
+  function readStore(key, fallback) {
+    try {
+      const raw = window.localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch (error) {
+      return fallback;
+    }
+  }
+
+  function writeStore(key, value) {
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      /* Storage can be unavailable in private or file contexts. */
+    }
+  }
+
+  const storedCart = readStore(STORAGE_KEYS.cart, {});
+  const cart = {};
+  if (storedCart && typeof storedCart === "object") {
+    Object.entries(storedCart).forEach(([id, qty]) => {
+      const productId = Number(id);
+      const quantity = Math.min(99, Math.max(1, Number(qty) || 0));
+      if (PRODUCT_MAP.has(productId) && quantity > 0) cart[productId] = quantity;
+    });
+  }
+
+  const storedWishlist = readStore(STORAGE_KEYS.wishlist, []);
+  const wishlist = new Set(
+    Array.isArray(storedWishlist)
+      ? storedWishlist.map(Number).filter((id) => PRODUCT_MAP.has(id))
+      : []
+  );
+
+  const state = { filter: "all", query: "" };
+
+  /* ---------- Helpers ---------- */
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+
+  const priceFormatter = new Intl.NumberFormat("en-PH", { maximumFractionDigits: 0 });
+  const formatPrice = (amount) => `₱${priceFormatter.format(amount)}`;
+
+  const escapeHTML = (value) =>
+    String(value).replace(/[&<>"']/g, (character) => {
+      const entities = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+      return entities[character];
+    });
+
+  const getProduct = (id) => PRODUCT_MAP.get(Number(id));
+
+  const starsMarkup = (rating) =>
+    `<span class="stars-base" aria-hidden="true">★★★★★</span><span class="stars-fill" aria-hidden="true">★★★★★</span>`;
+
+  const iconMarkup = (name) => `<svg class="icon" aria-hidden="true"><use href="#icon-${name}"/></svg>`;
+
+  /* ---------- Elements ---------- */
+  const siteHeader = $("#siteHeader");
+  const scrollProgress = $("#scrollProgress");
+  const backdrop = $("#backdrop");
+  const toastStack = $("#toastStack");
+
+  const searchToggle = $("#searchToggle");
+  const searchPanel = $("#searchPanel");
+  const searchClose = $("#searchClose");
+  const navSearchForm = $("#navSearchForm");
+  const navSearchInput = $("#navSearchInput");
+  const productSearch = $("#productSearch");
+  const clearSearch = $("#clearSearch");
+  const filterChips = $("#filterChips");
+  const productGrid = $("#productGrid");
+  const productEmpty = $("#productEmpty");
+  const productCount = $("#productCount");
+  const productStatus = $("#productStatus");
+  const resetFilters = $("#resetFilters");
+
+  const cartToggle = $("#cartToggle");
+  const cartCount = $("#cartCount");
+  const cartDrawer = $("#cartDrawer");
+  const cartDrawerCount = $("#cartDrawerCount");
+  const cartItems = $("#cartItems");
+  const cartEmpty = $("#cartEmpty");
+  const cartFoot = $("#cartFoot");
+  const cartSubtotal = $("#cartSubtotal");
+  const cartDelivery = $("#cartDelivery");
+  const cartTotal = $("#cartTotal");
+  const shippingHint = $("#shippingHint");
+  const shippingBar = $("#shippingBar");
+  const checkoutBtn = $("#checkoutBtn");
+
+  const wishlistToggle = $("#wishlistToggle");
+  const wishlistCount = $("#wishlistCount");
+  const wishlistDrawer = $("#wishlistDrawer");
+  const wishlistDrawerCount = $("#wishlistDrawerCount");
+  const wishlistItems = $("#wishlistItems");
+  const wishlistEmpty = $("#wishlistEmpty");
+  const wishlistFoot = $("#wishlistFoot");
+
+  const menuToggle = $("#menuToggle");
+  const mobileMenu = $("#mobileMenu");
+  const mobileClose = $("#mobileClose");
+
+  const productModal = $("#productModal");
+  const modalImage = $("#modalImage");
+  const modalBadge = $("#modalBadge");
+  const modalCategory = $("#modalCategory");
+  const modalName = $("#modalName");
+  const modalStars = $("#modalStars");
+  const modalRating = $("#modalRating");
+  const modalPrice = $("#modalPrice");
+  const modalDesc = $("#modalDesc");
+  const modalAdd = $("#modalAdd");
+  const modalWish = $("#modalWish");
+
+  const contactForm = $("#contactForm");
+  const fullName = $("#fullName");
+  const email = $("#email");
+  const message = $("#message");
+  const formStatus = $("#formStatus");
+
+  let modalProductId = null;
+  let lastModalFocus = null;
+  let overlayTrigger = null;
+
+  /* ---------- Toast notifications ---------- */
+  const toastIcons = {
+    success: iconMarkup("check"),
+    wishlist: iconMarkup("heart"),
+    info: iconMarkup("sparkle")
+  };
+
+  function showToast(text, type = "success") {
+    if (!toastStack) return;
+    const toast = document.createElement("div");
+    toast.className = `toast toast--${type}`;
+    toast.setAttribute("role", "status");
+    toast.innerHTML = `<span class="toast-icon">${toastIcons[type] || toastIcons.info}</span><p>${escapeHTML(text)}</p>`;
+    toastStack.appendChild(toast);
+
+    window.setTimeout(() => {
+      toast.classList.add("is-leaving");
+      window.setTimeout(() => toast.remove(), 320);
+    }, 3400);
+  }
+
+  function bump(element) {
+    if (!element) return;
+    element.classList.remove("bump");
+    void element.offsetWidth;
+    element.classList.add("bump");
+    window.setTimeout(() => element.classList.remove("bump"), 500);
+  }
+
+  /* ---------- Product rendering ---------- */
+  function filteredProducts() {
+    const query = state.query.trim().toLowerCase();
+    return PRODUCTS.filter((product) => {
+      let matchesFilter = true;
+      if (state.filter === "new") matchesFilter = product.badge === "New Arrival";
+      else if (state.filter !== "all") matchesFilter = product.category === state.filter;
+
+      const matchesQuery = !query || product.name.toLowerCase().includes(query);
+      return matchesFilter && matchesQuery;
+    });
+  }
+
+  function productCard(product, index) {
+    const saved = wishlist.has(product.id);
+    const badgeClass = product.badge === "Best Seller" ? "badge--best" : "badge--new";
+    const badge = product.badge
+      ? `<span class="badge ${badgeClass}">${escapeHTML(product.badge)}</span>`
+      : "";
+
+    return `
+      <article class="product-card" style="--i:${index}">
+        <div class="product-media" data-quickview="${product.id}">
+          <img src="./img/${product.image}" alt="${escapeHTML(product.name)} — ${escapeHTML(CATEGORY_LABELS[product.category])}" loading="lazy" width="1024" height="1280">
+          ${badge}
+          <button type="button" class="wish-btn${saved ? " is-active" : ""}" data-wish="${product.id}" aria-pressed="${saved}" aria-label="${saved ? "Remove" : "Add"} ${escapeHTML(product.name)} ${saved ? "from" : "to"} wishlist">
+            ${iconMarkup("heart")}
+          </button>
+          <button type="button" class="quick-btn" data-quickview="${product.id}">
+            ${iconMarkup("eye")} Quick View
+          </button>
+        </div>
+        <div class="product-info">
+          <div class="product-meta">
+            <span class="product-category">${escapeHTML(CATEGORY_LABELS[product.category])}</span>
+            <span class="product-rating">
+              <span class="stars" style="--rating:${product.rating}" role="img" aria-label="Rated ${product.rating} out of 5">${starsMarkup(product.rating)}</span>
+              <span>${product.rating.toFixed(1)}</span>
+            </span>
+          </div>
+          <button type="button" class="product-name" data-quickview="${product.id}">${escapeHTML(product.name)}</button>
+          <div class="product-bottom">
+            <p class="price">${formatPrice(product.price)}</p>
+            <button type="button" class="add-btn" data-add="${product.id}" aria-label="Add ${escapeHTML(product.name)} to bag">
+              ${iconMarkup("bag")} Add to Bag
+            </button>
+          </div>
+        </div>
+      </article>`;
+  }
+
+  function renderProducts() {
+    const list = filteredProducts();
+    productGrid.innerHTML = list.map(productCard).join("");
+    productEmpty.hidden = list.length > 0;
+    productCount.textContent = `${list.length} ${list.length === 1 ? "piece" : "pieces"}`;
+
+    const filterLabel =
+      state.filter === "all"
+        ? "all pieces"
+        : state.filter === "new"
+          ? "new arrivals"
+          : CATEGORY_LABELS[state.filter] || "pieces";
+    const queryLabel = state.query ? ` matching “${state.query}”` : "";
+    if (productStatus) {
+      productStatus.textContent = `Showing ${list.length} ${list.length === 1 ? "piece" : "pieces"} from ${filterLabel}${queryLabel}.`;
+    }
+  }
+
+  function syncChips() {
+    $$(".chip", filterChips).forEach((chip) => {
+      chip.classList.toggle("is-active", chip.dataset.filter === state.filter);
+    });
+  }
+
+  function syncSearchInputs(origin) {
+    if (origin !== "toolbar") productSearch.value = state.query;
+    if (origin !== "nav") navSearchInput.value = state.query;
+    if (clearSearch) clearSearch.hidden = state.query.length === 0;
+  }
+
+  function applyFilter(filter) {
+    state.filter = filter;
+    state.query = "";
+    syncSearchInputs("filter");
+    syncChips();
+    renderProducts();
+  }
+
+  function applyQuery(value, origin) {
+    state.query = value;
+    if (value.trim()) {
+      state.filter = "all";
+      syncChips();
+    }
+    syncSearchInputs(origin);
+    renderProducts();
+  }
+
+  /* ---------- Cart rendering & logic ---------- */
+  function cartEntries() {
+    return Object.entries(cart)
+      .map(([id, qty]) => ({ product: getProduct(Number(id)), qty: Number(qty) }))
+      .filter((entry) => entry.product && entry.qty > 0);
+  }
+
+  function calculateTotals() {
+    const subtotal = cartEntries().reduce(
+      (sum, entry) => sum + entry.product.price * entry.qty,
+      0
+    );
+    const delivery =
+      subtotal === 0 || subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : DELIVERY_FEE;
+    return { subtotal, delivery, total: subtotal + delivery };
+  }
+
+  function cartItemMarkup(entry) {
+    const { product, qty } = entry;
+    const category = CATEGORY_LABELS[product.category];
+    return `
+      <article class="cart-item">
+        <img class="cart-thumb" src="./img/${product.image}" alt="${escapeHTML(product.name)}" loading="lazy" width="82" height="102">
+        <div class="cart-item-main">
+          <div class="cart-item-top">
+            <h3>${escapeHTML(product.name)}</h3>
+            <button type="button" class="remove-btn" data-remove="${product.id}" aria-label="Remove ${escapeHTML(product.name)} from bag">
+              ${iconMarkup("trash")}
+            </button>
+          </div>
+          <p class="cart-item-cat">${escapeHTML(category)}</p>
+          <div class="cart-item-bottom">
+            <div class="qty-control" role="group" aria-label="Quantity for ${escapeHTML(product.name)}">
+              <button type="button" class="qty-btn" data-dec="${product.id}" aria-label="Decrease quantity of ${escapeHTML(product.name)}">${iconMarkup("minus")}</button>
+              <span class="qty-value">${qty}</span>
+              <button type="button" class="qty-btn" data-inc="${product.id}" aria-label="Increase quantity of ${escapeHTML(product.name)}">${iconMarkup("plus")}</button>
+            </div>
+            <p class="cart-item-price">${formatPrice(product.price * qty)}</p>
+          </div>
+        </div>
+      </article>`;
+  }
+
+  function renderCart() {
+    const entries = cartEntries();
+    cartItems.innerHTML = entries.map(cartItemMarkup).join("");
+
+    const totalQuantity = entries.reduce((sum, entry) => sum + entry.qty, 0);
+    cartDrawerCount.textContent = totalQuantity;
+    cartCount.textContent = totalQuantity;
+
+    const isEmpty = entries.length === 0;
+    cartEmpty.hidden = !isEmpty;
+    cartFoot.hidden = isEmpty;
+
+    if (isEmpty) return;
+
+    const { subtotal, delivery, total } = calculateTotals();
+    cartSubtotal.textContent = formatPrice(subtotal);
+    cartDelivery.textContent = delivery === 0 ? "Complimentary" : formatPrice(delivery);
+    cartTotal.textContent = formatPrice(total);
+
+    const remaining = Math.max(0, FREE_DELIVERY_THRESHOLD - subtotal);
+    shippingHint.textContent =
+      remaining > 0
+        ? `Add ${formatPrice(remaining)} more for complimentary delivery.`
+        : "You have unlocked complimentary delivery.";
+    shippingBar.style.width = `${Math.min(100, (subtotal / FREE_DELIVERY_THRESHOLD) * 100)}%`;
+  }
+
+  function persistCart() {
+    writeStore(STORAGE_KEYS.cart, cart);
+  }
+
+  function addToCart(id) {
+    const product = getProduct(id);
+    if (!product) return;
+    cart[product.id] = Math.min(99, (cart[product.id] || 0) + 1);
+    persistCart();
+    renderCart();
+    bump(cartCount);
+    showToast(`${product.name} added to your bag.`, "success");
+  }
+
+  function removeFromCart(id) {
+    const product = getProduct(id);
+    if (!product || !cart[product.id]) return;
+    delete cart[product.id];
+    persistCart();
+    renderCart();
+    showToast(`${product.name} removed from your bag.`, "info");
+  }
+
+  function changeQuantity(id, delta) {
+    const product = getProduct(id);
+    if (!product || !cart[product.id]) return;
+    const next = cart[product.id] + delta;
+
+    if (next <= 0) {
+      delete cart[product.id];
+      persistCart();
+      renderCart();
+      showToast(`${product.name} removed from your bag.`, "info");
+      return;
+    }
+
+    cart[product.id] = Math.min(99, next);
+    persistCart();
+    renderCart();
+  }
+
+  /* ---------- Wishlist ---------- */
+  function persistWishlist() {
+    writeStore(STORAGE_KEYS.wishlist, Array.from(wishlist));
+  }
+
+  function wishlistItemMarkup(product) {
+    const category = CATEGORY_LABELS[product.category];
+    return `
+      <article class="wishlist-item">
+        <button type="button" class="wish-thumb" data-quickview="${product.id}" aria-label="View ${escapeHTML(product.name)}">
+          <img src="./img/${product.image}" alt="${escapeHTML(product.name)}" loading="lazy" width="82" height="102">
+        </button>
+        <div class="wishlist-main">
+          <div class="cart-item-top">
+            <h3>${escapeHTML(product.name)}</h3>
+            <button type="button" class="remove-btn" data-remove-wish="${product.id}" aria-label="Remove ${escapeHTML(product.name)} from wishlist">
+              ${iconMarkup("trash")}
+            </button>
+          </div>
+          <p class="cart-item-cat">${escapeHTML(category)}</p>
+          <p class="cart-item-price">${formatPrice(product.price)}</p>
+          <div class="wishlist-actions">
+            <button type="button" class="mini-btn" data-add="${product.id}">Add to Bag</button>
+            <button type="button" class="mini-btn mini-btn--ghost" data-quickview="${product.id}">Details</button>
+          </div>
+        </div>
+      </article>`;
+  }
+
+  function renderWishlist() {
+    const items = Array.from(wishlist)
+      .map(getProduct)
+      .filter(Boolean);
+
+    wishlistItems.innerHTML = items.map(wishlistItemMarkup).join("");
+    wishlistEmpty.hidden = items.length > 0;
+    wishlistFoot.hidden = items.length === 0;
+    wishlistDrawerCount.textContent = items.length;
+    wishlistCount.textContent = items.length;
+  }
+
+  function syncWishButtons() {
+    $$("[data-wish]").forEach((button) => {
+      const product = getProduct(button.dataset.wish);
+      if (!product) return;
+      const saved = wishlist.has(product.id);
+      button.classList.toggle("is-active", saved);
+      button.setAttribute("aria-pressed", String(saved));
+      button.setAttribute(
+        "aria-label",
+        `${saved ? "Remove" : "Add"} ${product.name} ${saved ? "from" : "to"} wishlist`
+      );
+    });
+    updateModalWish();
+  }
+
+  function toggleWishlist(id) {
+    const product = getProduct(id);
+    if (!product) return;
+    const adding = !wishlist.has(product.id);
+
+    if (adding) wishlist.add(product.id);
+    else wishlist.delete(product.id);
+
+    persistWishlist();
+    renderWishlist();
+    syncWishButtons();
+    bump(wishlistCount);
+    showToast(
+      adding
+        ? `${product.name} saved to your wishlist.`
+        : `${product.name} removed from your wishlist.`,
+      adding ? "wishlist" : "info"
+    );
+  }
+
+  /* ---------- Overlay management ---------- */
+  function syncBodyLock() {
+    const shouldLock =
+      cartDrawer.classList.contains("is-open") ||
+      wishlistDrawer.classList.contains("is-open") ||
+      mobileMenu.classList.contains("is-open") ||
+      productModal.classList.contains("is-open");
+    document.body.classList.toggle("no-scroll", shouldLock);
+  }
+
+  function closeOverlays(restoreFocus = false) {
+    let wasOpen = false;
+    [cartDrawer, wishlistDrawer, mobileMenu].forEach((overlay) => {
+      if (overlay.classList.contains("is-open")) {
+        wasOpen = true;
+        if (overlay.contains(document.activeElement)) document.activeElement.blur();
+      }
+      overlay.classList.remove("is-open");
+      overlay.setAttribute("aria-hidden", "true");
+    });
+    if (backdrop) backdrop.classList.remove("is-active");
+    syncBodyLock();
+
+    if (restoreFocus && wasOpen && overlayTrigger && document.contains(overlayTrigger)) {
+      overlayTrigger.focus({ preventScroll: true });
+    }
+    overlayTrigger = null;
+  }
+
+  function openOverlay(overlay, focusTarget) {
+    closeOverlays();
+    overlayTrigger = document.activeElement;
+    overlay.classList.add("is-open");
+    overlay.setAttribute("aria-hidden", "false");
+    if (backdrop) backdrop.classList.add("is-active");
+    syncBodyLock();
+
+    window.setTimeout(() => {
+      const target = focusTarget || overlay.querySelector(".drawer-close");
+      if (target) target.focus({ preventScroll: true });
+    }, 180);
+  }
+
+  function scrollToShop() {
+    const shop = document.getElementById("shop");
+    if (!shop) return;
+    shop.scrollIntoView({
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+      block: "start"
+    });
+  }
+
+  /* ---------- Product modal ---------- */
+  function updateModalWish() {
+    if (!modalWish || !modalProductId) return;
+    const saved = wishlist.has(modalProductId);
+    modalWish.classList.toggle("is-active", saved);
+    modalWish.setAttribute("aria-pressed", String(saved));
+    const label = modalWish.querySelector("span");
+    if (label) label.textContent = saved ? "Saved" : "Save";
+  }
+
+  function openProductModal(id) {
+    const product = getProduct(id);
+    if (!product) return;
+
+    closeOverlays();
+    modalProductId = product.id;
+    lastModalFocus = document.activeElement;
+
+    modalImage.src = `./img/${product.image}`;
+    modalImage.alt = product.name;
+    modalCategory.textContent = CATEGORY_LABELS[product.category];
+    modalName.textContent = product.name;
+    modalPrice.textContent = formatPrice(product.price);
+    modalDesc.textContent = product.description;
+    modalRating.textContent = `${product.rating.toFixed(1)} / 5`;
+    modalStars.style.setProperty("--rating", product.rating);
+    modalStars.innerHTML = starsMarkup(product.rating);
+    modalStars.setAttribute("role", "img");
+    modalStars.setAttribute("aria-label", `Rated ${product.rating} out of 5`);
+
+    if (product.badge) {
+      modalBadge.hidden = false;
+      modalBadge.textContent = product.badge;
+      modalBadge.className = `badge ${product.badge === "Best Seller" ? "badge--best" : "badge--new"}`;
+    } else {
+      modalBadge.hidden = true;
+    }
+
+    updateModalWish();
+    productModal.classList.add("is-open");
+    productModal.setAttribute("aria-hidden", "false");
+    syncBodyLock();
+
+    window.setTimeout(() => {
+      const closeButton = productModal.querySelector(".modal-close");
+      if (closeButton) closeButton.focus({ preventScroll: true });
+    }, 180);
+  }
+
+  function closeProductModal() {
+    if (!productModal.classList.contains("is-open")) return;
+    if (productModal.contains(document.activeElement)) document.activeElement.blur();
+    productModal.classList.remove("is-open");
+    productModal.setAttribute("aria-hidden", "true");
+    syncBodyLock();
+
+    if (
+      lastModalFocus &&
+      document.contains(lastModalFocus) &&
+      !lastModalFocus.closest(".drawer, .mobile-panel")
+    ) {
+      lastModalFocus.focus({ preventScroll: true });
+    }
+    lastModalFocus = null;
+    modalProductId = null;
+  }
+
+  /* ---------- Search ---------- */
+  function openSearch() {
+    searchPanel.classList.add("is-open");
+    searchToggle.setAttribute("aria-expanded", "true");
+    window.setTimeout(() => navSearchInput.focus(), 140);
+  }
+
+  function closeSearch() {
+    searchPanel.classList.remove("is-open");
+    searchToggle.setAttribute("aria-expanded", "false");
+  }
+
+  /* ---------- Header scroll effects ---------- */
+  const navLinks = new Map($$("[data-nav]").map((link) => [link.dataset.nav, link]));
+  const spySections = ["home", "collections", "shop", "about", "contact"]
+    .map((id) => document.getElementById(id))
+    .filter(Boolean);
+
+  let scrollTicking = false;
+
+  function updateOnScroll() {
+    const scrollY = window.scrollY;
+    siteHeader.classList.toggle("is-scrolled", scrollY > 30);
+
+    const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+    const progress = scrollable > 0 ? Math.min(1, scrollY / scrollable) : 0;
+    scrollProgress.style.transform = `scaleX(${progress})`;
+
+    const probe = scrollY + 170;
+    let current = "home";
+    spySections.forEach((section) => {
+      if (section.offsetTop <= probe) current = section.id;
+    });
+    navLinks.forEach((link, id) => {
+      link.classList.toggle("is-active", id === current);
+    });
+
+    scrollTicking = false;
+  }
+
+  function requestScrollUpdate() {
+    if (scrollTicking) return;
+    scrollTicking = true;
+    window.requestAnimationFrame(updateOnScroll);
+  }
+
+  /* ---------- Reveal animations ---------- */
+  function initReveal() {
+    const elements = $$(".reveal");
+    if (!("IntersectionObserver" in window)) {
+      elements.forEach((element) => element.classList.add("in-view"));
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add("in-view");
+          observer.unobserve(entry.target);
+        });
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -6% 0px" }
+    );
+
+    elements.forEach((element) => observer.observe(element));
+  }
+
+  /* ---------- Event wiring ---------- */
+  function bindEvents() {
+    /* Search */
+    searchToggle.addEventListener("click", () => {
+      if (searchPanel.classList.contains("is-open")) closeSearch();
+      else openSearch();
+    });
+    searchClose.addEventListener("click", () => {
+      closeSearch();
+      searchToggle.focus();
+    });
+    navSearchForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      applyQuery(navSearchInput.value, "nav");
+      closeSearch();
+      scrollToShop();
+    });
+    navSearchInput.addEventListener("input", () => {
+      applyQuery(navSearchInput.value, "nav");
+    });
+
+    productSearch.addEventListener("input", () => {
+      applyQuery(productSearch.value, "toolbar");
+    });
+    clearSearch.addEventListener("click", () => {
+      applyQuery("", "clear");
+      productSearch.focus();
+    });
+    resetFilters.addEventListener("click", () => {
+      applyFilter("all");
+      scrollToShop();
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!searchPanel.classList.contains("is-open")) return;
+      if (event.target.closest("#siteHeader")) return;
+      closeSearch();
+    });
+
+    /* Filters */
+    filterChips.addEventListener("click", (event) => {
+      const chip = event.target.closest("[data-filter]");
+      if (!chip) return;
+      applyFilter(chip.dataset.filter);
+    });
+
+    $$("[data-category-filter], [data-filter-link]").forEach((link) => {
+      link.addEventListener("click", () => {
+        const filter = link.dataset.categoryFilter || link.dataset.filterLink;
+        if (filter) applyFilter(filter);
+      });
+    });
+
+    /* Product grid actions */
+    productGrid.addEventListener("click", (event) => {
+      const wishButton = event.target.closest("[data-wish]");
+      if (wishButton) {
+        toggleWishlist(Number(wishButton.dataset.wish));
+        return;
+      }
+      const addButton = event.target.closest("[data-add]");
+      if (addButton) {
+        addToCart(Number(addButton.dataset.add));
+        return;
+      }
+      const quickView = event.target.closest("[data-quickview]");
+      if (quickView) openProductModal(Number(quickView.dataset.quickview));
+    });
+
+    /* Drawers */
+    cartToggle.addEventListener("click", () => openOverlay(cartDrawer));
+    wishlistToggle.addEventListener("click", () => openOverlay(wishlistDrawer));
+    menuToggle.addEventListener("click", () => openOverlay(mobileMenu, mobileClose));
+    backdrop.addEventListener("click", () => closeOverlays(true));
+
+    cartDrawer.addEventListener("click", (event) => {
+      const increase = event.target.closest("[data-inc]");
+      if (increase) {
+        changeQuantity(Number(increase.dataset.inc), 1);
+        return;
+      }
+      const decrease = event.target.closest("[data-dec]");
+      if (decrease) {
+        changeQuantity(Number(decrease.dataset.dec), -1);
+        return;
+      }
+      const remove = event.target.closest("[data-remove]");
+      if (remove) {
+        removeFromCart(Number(remove.dataset.remove));
+        return;
+      }
+      const close = event.target.closest("[data-close-drawer]");
+      if (close) closeOverlays(true);
+    });
+
+    wishlistDrawer.addEventListener("click", (event) => {
+      const remove = event.target.closest("[data-remove-wish]");
+      if (remove) {
+        toggleWishlist(Number(remove.dataset.removeWish));
+        return;
+      }
+      const add = event.target.closest("[data-add]");
+      if (add) {
+        addToCart(Number(add.dataset.add));
+        return;
+      }
+      const quickView = event.target.closest("[data-quickview]");
+      if (quickView) {
+        openProductModal(Number(quickView.dataset.quickview));
+        return;
+      }
+      const close = event.target.closest("[data-close-drawer]");
+      if (close) closeOverlays(true);
+    });
+
+    checkoutBtn.addEventListener("click", () => {
+      showToast("This is a static boutique demo — no payment is processed.", "info");
+    });
+
+    /* Mobile menu links */
+    $$("[data-mobile-link]").forEach((link) => {
+      link.addEventListener("click", (event) => {
+        event.preventDefault();
+        const target = document.querySelector(link.getAttribute("href"));
+        closeOverlays();
+        if (!target) return;
+        window.setTimeout(() => {
+          target.scrollIntoView({
+            behavior: prefersReducedMotion ? "auto" : "smooth",
+            block: "start"
+          });
+        }, 80);
+      });
+    });
+    mobileClose.addEventListener("click", () => closeOverlays(true));
+
+    /* Product modal */
+    productModal.addEventListener("click", (event) => {
+      if (event.target.closest("[data-close-modal]")) closeProductModal();
+    });
+    modalAdd.addEventListener("click", () => {
+      if (modalProductId) addToCart(modalProductId);
+    });
+    modalWish.addEventListener("click", () => {
+      if (modalProductId) toggleWishlist(modalProductId);
+    });
+
+    /* Global small actions */
+    document.addEventListener("click", (event) => {
+      const emptyShop = event.target.closest("[data-empty-shop]");
+      if (emptyShop) {
+        closeOverlays();
+        window.setTimeout(scrollToShop, 80);
+        return;
+      }
+
+      const social = event.target.closest("[data-social]");
+      if (social) {
+        showToast(
+          `${social.dataset.social} is not connected in this static demo.`,
+          "info"
+        );
+        return;
+      }
+
+      const closeDrawer = event.target.closest("[data-close-drawer]");
+      if (closeDrawer) closeOverlays(true);
+    });
+
+    /* Keyboard */
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      if (productModal.classList.contains("is-open")) {
+        closeProductModal();
+        return;
+      }
+      if (
+        cartDrawer.classList.contains("is-open") ||
+        wishlistDrawer.classList.contains("is-open") ||
+        mobileMenu.classList.contains("is-open")
+      ) {
+        closeOverlays(true);
+        return;
+      }
+      if (searchPanel.classList.contains("is-open")) closeSearch();
+    });
+
+    /* Contact form */
+    const fieldConfig = [
+      { input: fullName, error: $("#nameError") },
+      { input: email, error: $("#emailError") },
+      { input: message, error: $("#messageError") }
+    ];
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+    function setFieldError(input, errorElement, messageText) {
+      const field = input.closest(".field");
+      if (field) field.classList.toggle("has-error", Boolean(messageText));
+      input.setAttribute("aria-invalid", messageText ? "true" : "false");
+      if (errorElement) errorElement.textContent = messageText;
+    }
+
+    fieldConfig.forEach(({ input, error }) => {
+      input.addEventListener("input", () => {
+        setFieldError(input, error, "");
+        if (formStatus.classList.contains("is-success")) {
+          formStatus.classList.remove("is-success");
+          formStatus.textContent = "";
+        }
+      });
+    });
+
+    contactForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      formStatus.classList.remove("is-success");
+      formStatus.textContent = "";
+
+      const nameValue = fullName.value.trim();
+      const emailValue = email.value.trim();
+      const messageValue = message.value.trim();
+
+      const nameError = nameValue.length >= 2 ? "" : "Please enter your full name.";
+      const emailError = !emailValue
+        ? "Please enter your email address."
+        : emailPattern.test(emailValue)
+          ? ""
+          : "Please enter a valid email address.";
+      const messageError =
+        messageValue.length >= 10
+          ? ""
+          : "Please share a few more details (at least 10 characters).";
+
+      setFieldError(fullName, $("#nameError"), nameError);
+      setFieldError(email, $("#emailError"), emailError);
+      setFieldError(message, $("#messageError"), messageError);
+
+      if (nameError || emailError || messageError) {
+        const firstInvalid = [fullName, email, message].find(
+          (input) => input.getAttribute("aria-invalid") === "true"
+        );
+        if (firstInvalid) firstInvalid.focus();
+        return;
+      }
+
+      formStatus.textContent = `Thank you, ${nameValue}. Your message is ready. This is a static demo, so nothing was sent — you can reach us directly at 09996751245 or @marygraceG.`;
+      formStatus.classList.add("is-success");
+      contactForm.reset();
+      fieldConfig.forEach(({ input, error }) => setFieldError(input, error, ""));
+    });
+
+    /* Scroll + resize */
+    window.addEventListener("scroll", requestScrollUpdate, { passive: true });
+    window.addEventListener("resize", requestScrollUpdate);
+  }
+
+  /* ---------- Init ---------- */
+  renderProducts();
+  renderCart();
+  renderWishlist();
+  syncWishButtons();
+  bindEvents();
+  initReveal();
+  updateOnScroll();
+})();
